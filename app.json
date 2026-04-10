@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Tuntun",
+    "slug": "tuntun",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourname.tuntun"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#4F46E5"
+      },
+      "package": "com.yourname.tuntun"
+    }
+  }
+}

@@ -18,6 +18,7 @@ import {
   onSnapshot,
   addDoc,
   deleteDoc,
+  updateDoc,
   doc,
   serverTimestamp,
   query,
@@ -30,9 +31,10 @@ export default function HomeScreen() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newQuantity, setNewQuantity] = useState('1');
-  const [newCategory, setNewCategory] = useState('');
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [name, setName] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [category, setCategory] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -48,20 +50,46 @@ export default function HomeScreen() {
     return unsubscribe;
   }, []);
 
-  const handleAdd = async () => {
-    if (!newName.trim()) return;
+  const openAdd = () => {
+    setEditingItem(null);
+    setName('');
+    setQuantity('1');
+    setCategory('');
+    setModalVisible(true);
+  };
+
+  const openEdit = (item: Item) => {
+    setEditingItem(item);
+    setName(item.name);
+    setQuantity(String(item.quantity));
+    setCategory(item.category);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setEditingItem(null);
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'items'), {
-        name: newName.trim(),
-        quantity: parseInt(newQuantity, 10) || 1,
-        category: newCategory.trim() || 'General',
-        createdAt: serverTimestamp(),
-      });
-      setNewName('');
-      setNewQuantity('1');
-      setNewCategory('');
-      setModalVisible(false);
+      if (editingItem) {
+        await updateDoc(doc(db, 'items', editingItem.id), {
+          name: name.trim(),
+          quantity: parseInt(quantity, 10) || 1,
+          category: category.trim() || 'General',
+        });
+      } else {
+        await addDoc(collection(db, 'items'), {
+          name: name.trim(),
+          quantity: parseInt(quantity, 10) || 1,
+          category: category.trim() || 'General',
+          createdAt: serverTimestamp(),
+        });
+      }
+      closeModal();
     } finally {
       setSaving(false);
     }
@@ -73,7 +101,10 @@ export default function HomeScreen() {
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => deleteDoc(doc(db, 'items', item.id)),
+        onPress: async () => {
+          closeModal();
+          await deleteDoc(doc(db, 'items', item.id));
+        },
       },
     ]);
   };
@@ -81,7 +112,7 @@ export default function HomeScreen() {
   const renderItem = ({ item }: { item: Item }) => (
     <TouchableOpacity
       style={styles.card}
-      onLongPress={() => handleDelete(item)}
+      onPress={() => openEdit(item)}
       activeOpacity={0.7}
     >
       <View style={styles.cardContent}>
@@ -128,7 +159,7 @@ export default function HomeScreen() {
 
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => setModalVisible(true)}
+        onPress={openAdd}
         activeOpacity={0.85}
       >
         <Text style={styles.fabText}>+</Text>
@@ -138,21 +169,23 @@ export default function HomeScreen() {
         visible={modalVisible}
         animationType="slide"
         transparent
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={closeModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Add Item</Text>
+            <Text style={styles.modalTitle}>
+              {editingItem ? 'Edit Item' : 'Add Item'}
+            </Text>
 
             <TextInput
               style={styles.input}
               placeholder="Name  (e.g. Diapers)"
               placeholderTextColor="#9CA3AF"
-              value={newName}
-              onChangeText={setNewName}
+              value={name}
+              onChangeText={setName}
               autoFocus
               returnKeyType="next"
             />
@@ -160,16 +193,16 @@ export default function HomeScreen() {
               style={styles.input}
               placeholder="Category  (e.g. Baby)"
               placeholderTextColor="#9CA3AF"
-              value={newCategory}
-              onChangeText={setNewCategory}
+              value={category}
+              onChangeText={setCategory}
               returnKeyType="next"
             />
             <TextInput
               style={styles.input}
               placeholder="Quantity"
               placeholderTextColor="#9CA3AF"
-              value={newQuantity}
-              onChangeText={setNewQuantity}
+              value={quantity}
+              onChangeText={setQuantity}
               keyboardType="number-pad"
               returnKeyType="done"
             />
@@ -177,18 +210,29 @@ export default function HomeScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => setModalVisible(false)}
+                onPress={closeModal}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.addButton, (!newName.trim() || saving) && styles.addButtonDisabled]}
-                onPress={handleAdd}
-                disabled={!newName.trim() || saving}
+                style={[styles.saveButton, (!name.trim() || saving) && styles.saveButtonDisabled]}
+                onPress={handleSave}
+                disabled={!name.trim() || saving}
               >
-                <Text style={styles.addButtonText}>{saving ? 'Adding…' : 'Add'}</Text>
+                <Text style={styles.saveButtonText}>
+                  {saving ? 'Saving…' : editingItem ? 'Save' : 'Add'}
+                </Text>
               </TouchableOpacity>
             </View>
+
+            {editingItem && (
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => handleDelete(editingItem)}
+              >
+                <Text style={styles.deleteButtonText}>Delete Item</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -353,19 +397,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
   },
-  addButton: {
+  saveButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 10,
     backgroundColor: '#4F46E5',
     alignItems: 'center',
   },
-  addButtonDisabled: {
+  saveButtonDisabled: {
     backgroundColor: '#A5B4FC',
   },
-  addButtonText: {
+  saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  deleteButton: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#EF4444',
   },
 });

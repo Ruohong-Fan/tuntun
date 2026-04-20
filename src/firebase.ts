@@ -1,8 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 
-// Go to https://console.firebase.google.com → your project → Project Settings → Your apps
-// Copy the firebaseConfig object and paste it here.
 const firebaseConfig = {
   apiKey: 'AIzaSyDSuRa0xBHZgKWBS2lTfcMzb6I-EvycFp8',
   authDomain: 'tuntun-a19b0.firebaseapp.com',
@@ -13,4 +11,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Force long-polling transport — React Native / Android emulators often fail
+// to establish Firestore's default WebChannel streaming connection.
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+});
